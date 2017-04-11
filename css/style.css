@@ -1,5 +1,6 @@
 body {
 	background: #22222a;
+	-webkit-user-select: none;
 }
 
 #menu {
@@ -51,4 +52,7 @@ body {
 	position: absolute;
 	top: 50%;
 	left: 0;
+
+	background: #2a2a32;
+	cursor: crosshair;
 }

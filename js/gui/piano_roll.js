@@ -12,6 +12,17 @@ function piano_roll () {
 		note_duration : 0,
 		h : 0,
 		type : 0
+	};
+
+	this.drag = {
+		last_x : -1,
+		last_y : -1,
+		active : false
+	};
+
+	this.viewport = {
+		x : 0,
+		y : 0
 	}
 
 	this.init = function (canvas) {
@@ -30,15 +41,24 @@ function piano_roll () {
 		var y = e.pageY - 40;
 		var p = core.gui.piano_roll;
 
-		p.selection.active = true;
-		p.selection.note_time = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
-		p.selection.note_type = Math.floor(y/p.h);
-		p.selection.note_duration = 0;
-
-		if(e.which == 1) {
-			p.selection.type = 0;
+		if(e.which == 2) {
+			p.drag.active = true;
+			p.drag.last_x = x;
+			p.drag.last_y = y;
 		} else {
-			p.selection.type = 1;
+			x -= p.viewport.x;
+			y -= p.viewport.y;
+
+			p.selection.active = true;
+			p.selection.note_time = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
+			p.selection.note_type = Math.floor(y/p.h);
+			p.selection.note_duration = 0;
+
+			if(e.which == 1) {
+				p.selection.type = 0;
+			} else if (e.which == 3) {
+				p.selection.type = 1;
+			}
 		}
 
 		p.draw();
@@ -50,55 +70,88 @@ function piano_roll () {
 		var p = core.gui.piano_roll;
 
 		if(p.selection.active) {
+			x -= p.viewport.x;
+			y -= p.viewport.y;
+
 			p.selection.note_duration = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap - p.selection.note_time;
 
 			if(p.selection.type == 1) {
 				p.selection.h = Math.ceil(y/p.h) - p.selection.note_type;
 			}
+
+			p.cursor = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
+		} else if (p.drag.active) {
+			p.viewport.x += x - p.drag.last_x;
+			p.viewport.y += y - p.drag.last_y;
+
+			p.viewport.x = Math.min(p.viewport.x, 0);
+
+			p.drag.last_x = x;
+			p.drag.last_y = y;
+
+			x -= p.viewport.x;
+			y -= p.viewport.y;
+
+			p.cursor = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
+		} else {
+			x -= p.viewport.x;
+			y -= p.viewport.y;
+
+			p.cursor = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
 		}
 
-		p.cursor = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
 		p.draw();
 	};
 
-	this.mouseup = function (e) {
+	this.mouseup = function (e, pass) {
 		var x = e.pageX;
 		var y = e.pageY - 40;
 		var p = core.gui.piano_roll;
 
-		p.selection.active = false;
-		p.selection.note_duration = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap - p.selection.note_time;
+		if(p.selection.active) {
+			x -= p.viewport.x;
+			y -= p.viewport.y;
 
-		if(p.selection.type == 1) {
-			p.selection.h = Math.ceil(y/p.h) - p.selection.note_type;
+			p.selection.active = false;
+			p.selection.note_duration = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap - p.selection.note_time;
 
-			if(p.selection.h < 0) {
-				p.selection.note_type = p.selection.note_type + p.selection.h;
-				p.selection.h *= -1;
-			}
-		}
+			if(p.selection.type == 1) {
+				p.selection.h = Math.ceil(y/p.h) - p.selection.note_type;
 
-		if(p.selection.note_duration < 0) {
-			p.selection.note_time = p.selection.note_time + p.selection.note_duration;
-			p.selection.note_duration *= -1;
-		}
-
-		if(p.selection.type == 0) {
-			core.project.patterns[p.pattern].data.push([p.selection.note_type, p.selection.note_time, p.selection.note_duration]);
-		} else if(p.selection.type == 1) {
-			var data = core.project.patterns[p.pattern].data;
-			var i = 0;
-			while (i < data.length) {
-				var note = data[i];
-				if(note[0] >= p.selection.note_type && note[0] <= p.selection.note_type+p.selection.h) {
-					if(note[1] < p.selection.note_duration+p.selection.note_time &&
-						note[1]+note[2] > p.selection.note_time) {
-						data.splice(i, 1);
-						i--;
-					}
+				if(p.selection.h < 0) {
+					p.selection.note_type = p.selection.note_type + p.selection.h;
+					p.selection.h *= -1;
 				}
-				i++;
 			}
+
+			if(p.selection.note_duration < 0) {
+				p.selection.note_time = p.selection.note_time + p.selection.note_duration;
+				p.selection.note_duration *= -1;
+			}
+
+			if(p.selection.type == 0) {
+				core.project.patterns[p.pattern].data.push([p.selection.note_type, p.selection.note_time, p.selection.note_duration]);
+			} else if(p.selection.type == 1) {
+				var data = core.project.patterns[p.pattern].data;
+				var i = 0;
+				while (i < data.length) {
+					var note = data[i];
+					if(note[0] >= p.selection.note_type && note[0] <= p.selection.note_type+p.selection.h) {
+						if(note[1] < p.selection.note_duration+p.selection.note_time &&
+							note[1]+note[2] > p.selection.note_time) {
+							data.splice(i, 1);
+							i--;
+						}
+					}
+					i++;
+				}
+			}
+		} else if (p.drag.active) {
+			p.drag.active = false;
+		}
+
+		if(pass != false) {
+			core.gui.project_view.mouseup(e, false);
 		}
 
 		p.draw();
@@ -106,6 +159,7 @@ function piano_roll () {
 
 	this.draw = function () {
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		this.ctx.translate(this.viewport.x, this.viewport.y);
 
 		var pattern = core.project.patterns[this.pattern];
 		for(var i = 0; i < pattern.data.length; i++) {
@@ -137,6 +191,8 @@ function piano_roll () {
 			}
 		}
 
+		this.ctx.translate(0, -this.viewport.y);
+
 		for(var i = 1; i < pattern.length*4+1; i++) {
 			var x = i*16;
 			with(this.ctx) {
@@ -166,5 +222,7 @@ function piano_roll () {
 			lineTo(this.cursor*this.w, this.canvas.height);
 			stroke();
 		}
+
+		this.ctx.translate(-this.viewport.x, 0);
 	};
 }

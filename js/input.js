@@ -3,7 +3,7 @@ const remote = electron.remote;
 
 document.onkeydown = function(event) {
 	console.log(event.which);
-	if (event.which = 123) {
+	if (event.which == 123) {
 		remote.getCurrentWindow().toggleDevTools();
 	} else {
 		

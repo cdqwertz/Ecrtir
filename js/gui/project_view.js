@@ -5,6 +5,17 @@ function project_view () {
 	this.w = 128;
 	this.h = 64;
 
+	this.drag = {
+		last_x : -1,
+		last_y : -1,
+		active : false
+	};
+
+	this.viewport = {
+		x : 0,
+		y : 0
+	};
+
 	this.init = function (canvas) {
 		this.canvas = canvas;
 		this.ctx = this.canvas.getContext("2d");
@@ -21,46 +32,55 @@ function project_view () {
 		var y = e.pageY - window.innerHeight/2;
 		var p = core.gui.project_view;
 
-		var my_pattern = Math.floor(y/p.h);
+		if(e.which == 1) {
+			x -= p.viewport.x;
+			y -= p.viewport.y;
 
-		if(x > p.w) {
-			var beat = Math.floor((x-p.w)/p.w);
+			var my_pattern = Math.floor(y/p.h);
 
-			if(my_pattern > core.project.track.data.length-1) {
-				core.project.track.data.push([]);
-				my_pattern = core.project.track.data.length-1;
+			if(x > p.w) {
+				var beat = Math.floor((x-p.w)/p.w);
 
-				core.project.patterns.push(new pattern(null, 4, []))
-			}
+				if(my_pattern > core.project.track.data.length-1) {
+					core.project.track.data.push([]);
+					my_pattern = core.project.track.data.length-1;
 
-			var len = core.project.patterns[my_pattern].length;
-			var a = false;
-			var b = 0;
-
-			var pattern_data = core.project.track.data[my_pattern];
-			for(var it = 0; it < pattern_data.length; it++){
-				if(pattern_data[it] <= beat && beat < pattern_data[it] + len) {
-					a = true;
-					b = it;
-					break;
+					core.project.patterns.push(new pattern(null, 1, []))
 				}
-			}
 
-			if (!a) {
-				core.project.track.data[my_pattern].push(beat);
+				var len = core.project.patterns[my_pattern].length;
+				var a = false;
+				var b = 0;
+
+				var pattern_data = core.project.track.data[my_pattern];
+				for(var it = 0; it < pattern_data.length; it++){
+					if(pattern_data[it] <= beat && beat < pattern_data[it] + len) {
+						a = true;
+						b = it;
+						break;
+					}
+				}
+
+				if (!a) {
+					core.project.track.data[my_pattern].push(beat);
+				} else {
+					core.project.track.data[my_pattern].splice(b, 1);
+				}
 			} else {
-				core.project.track.data[my_pattern].splice(b, 1);
-			}
-		} else {
-			if(my_pattern > core.project.track.data.length-1) {
-				core.project.track.data.push([]);
-				my_pattern = core.project.track.data.length-1;
+				if(my_pattern > core.project.track.data.length-1) {
+					core.project.track.data.push([]);
+					my_pattern = core.project.track.data.length-1;
 
-				core.project.patterns.push(new pattern(null, 4, []))
-			}
+					core.project.patterns.push(new pattern(null, 1, []))
+				}
 
-			core.gui.piano_roll.pattern = my_pattern;
-			core.gui.piano_roll.draw();
+				core.gui.piano_roll.pattern = my_pattern;
+				core.gui.piano_roll.draw();
+			}
+		} else if (e.which == 2) {
+			p.drag.active = true;
+			p.drag.last_x = x;
+			p.drag.last_y = y;
 		}
 
 		p.draw();
@@ -71,6 +91,20 @@ function project_view () {
 		var y = e.pageY - window.innerHeight/2;
 		var p = core.gui.project_view;
 
+		if(p.drag.active) {
+			p.viewport.x += x - p.drag.last_x;
+			p.viewport.y += y - p.drag.last_y;
+
+			p.viewport.x = Math.min(p.viewport.x, 0);
+			p.viewport.y = Math.min(p.viewport.y, 0);
+
+			p.drag.last_x = x;
+			p.drag.last_y = y;
+		}
+
+		x -= p.viewport.x;
+		y -= p.viewport.y;
+
 		if (x >= p.w) {
 			p.cursor = Math.round(x/p.w/p.cursor_snap) * p.cursor_snap;
 		} else {
@@ -80,16 +114,26 @@ function project_view () {
 		p.draw();
 	};
 
-	this.mouseup = function (e) {
+	this.mouseup = function (e, pass) {
 		var x = e.pageX;
 		var y = e.pageY - window.innerHeight/2;
 		var p = core.gui.project_view;
+
+		if(p.drag.active) {
+			p.drag.active = false;
+		}
+
+		if(pass != false) {
+			core.gui.piano_roll.mouseup(e, false);
+		}
 
 		p.draw();
 	};
 
 	this.draw = function () {
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+		this.ctx.translate(this.viewport.x, 0);
 
 		with(this.ctx) {
 			strokeStyle = "#334";
@@ -114,10 +158,12 @@ function project_view () {
 			}
 		}
 
+		this.ctx.translate(0, this.viewport.y);
+
 		for(var i = 0; i < track.data.length; i++) {
 			var my_pattern = track.data[i];
 
-			for(var j = 0; j < pattern.length; j++) {
+			for(var j = 0; j < my_pattern.length; j++) {
 				var x = this.w*(my_pattern[j] + 1);
 				var y = this.h*i;
 
@@ -134,6 +180,8 @@ function project_view () {
 			}
 		}
 
+		this.ctx.translate(0, -this.viewport.y);
+
 		with(this.ctx) {
 			strokeStyle = "#a22";
 			beginPath();
@@ -141,5 +189,7 @@ function project_view () {
 			lineTo(this.cursor*this.w, this.canvas.height);
 			stroke();
 		}
+
+		this.ctx.translate(-this.viewport.x, 0);
 	};
 }

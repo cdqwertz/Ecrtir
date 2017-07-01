@@ -6,6 +6,6 @@ document.onkeydown = function(event) {
 	if (event.which == 123) {
 		remote.getCurrentWindow().toggleDevTools();
 	} else {
-		
+
 	}
 }

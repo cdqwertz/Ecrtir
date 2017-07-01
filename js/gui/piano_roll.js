@@ -130,6 +130,7 @@ function piano_roll () {
 			}
 
 			if(p.selection.type == 0) {
+				console.log(p.selection.note_duration);
 				core.project.patterns[p.pattern].data.push([p.selection.note_type, p.selection.note_time, p.selection.note_duration]);
 			} else if(p.selection.type == 1) {
 				var data = core.project.patterns[p.pattern].data;
